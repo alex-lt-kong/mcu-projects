@@ -1,8 +1,9 @@
 #include "configs.h"
+
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
-#include <Adafruit_AHTX0.h>
+#include <Adafruit_AHTX.h>
 
 #define SDA_PIN 4  // D4
 #define SCL_PIN 5  // D5
@@ -12,7 +13,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 void setup_wifi() {
-  
+
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.println("Connecting to WiFi");
@@ -68,26 +69,26 @@ void loop() {
 
   static unsigned long lastMsg = 0;
   unsigned long now = millis();
-  if (now - lastMsg > 5000) {
-    lastMsg = now;
+  if (now - lastMsg < 60000) return;
 
-    sensors_event_t humidity, temp;
-    if (aht.getEvent(&humidity, &temp)) {
-      Serial.printf("Temperature: %.2f °C, Humidity: %.2f %\n", temp.temperature, humidity.relative_humidity);
-    } else {
-      Serial.println("Failed to read from DHT20");
-      return;
-    }
+  lastMsg = now;
 
-    delay(60000);
-
-    String payload = "{";
-    payload += "\"temp_celsius\": " + String(temp.temperature, 2) + ",";
-    payload += "\"RH\": " + String(humidity.relative_humidity, 2);
-    payload += "}";
-
-    Serial.print("Publishing: ");
-    Serial.println(payload);
-    client.publish(MQTT_TOPIC, payload.c_str());
+  sensors_event_t humidity, temp;
+  if (aht.getEvent(&humidity, &temp)) {
+    Serial.printf("Temperature: %.2f °C, Humidity: %.2f %\n", temp.temperature, humidity.relative_humidity);
+  } else {
+    Serial.println("Failed to read from DHT20");
+    return;
   }
+
+  delay(1000);
+
+  String payload = "{";
+  payload += "\"temp_celsius\": " + String(temp.temperature, 2) + ",";
+  payload += "\"RH\": " + String(humidity.relative_humidity, 2);
+  payload += "}";
+
+  Serial.print("Publishing: ");
+  Serial.println(payload);
+  client.publish(MQTT_TOPIC, payload.c_str());
 }
