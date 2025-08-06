@@ -94,5 +94,5 @@ void loop() {
   Serial.println(payload);
   mqtt_client.publish(MQTT_TOPIC, payload.c_str());
 
-  delay(1000);
+  delay(30000);
 }
