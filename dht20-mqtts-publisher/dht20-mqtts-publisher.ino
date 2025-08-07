@@ -2,12 +2,13 @@
 
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 #include <Adafruit_AHTX0.h>
 
 Adafruit_AHTX0 aht;
-WiFiClient wifi_client;
-PubSubClient mqtt_client(wifi_client);
+WiFiClientSecure wifi_client;
+PubSubClient mqtts_client(wifi_client);
 
 void setup_wifi(int attempts = 0) {
   const auto max_attempts = 10;
@@ -36,16 +37,16 @@ void setup_wifi(int attempts = 0) {
   setup_wifi(attempts + 1);
 }
 
-void reconnect_mqtt() {
-  while (!mqtt_client.connected()) {
+void reconnect_mqtts() {
+  while (!mqtts_client.connected()) {
     Serial.printf("Connecting to MQTT broker " MQTT_SERVER ":%d\n", MQTT_PORT);
-    if (mqtt_client.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
+    if (mqtts_client.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("connected");
     } else {
       const int retry_delay_ms = 10 * 1000;
-      Serial.print("mqtt_client.connect() failed, mqtt_client.state() = ");
-      Serial.print(mqtt_client.state());
-      Serial.printf(" retrying in %d seconds", retry_delay_ms / 1000);
+      Serial.print("mqtts_client.connect() failed, mqtts_client.state() = ");
+      Serial.print(mqtts_client.state());
+      Serial.printf(" retrying in %d seconds\n", retry_delay_ms / 1000);
       delay(retry_delay_ms);
     }
   }
@@ -72,7 +73,8 @@ void setup() {
     while (1) delay(1000);
   }
   setup_wifi();
-  mqtt_client.setServer(MQTT_SERVER, MQTT_PORT);
+  wifi_client.setCACert(root_ca);
+  mqtts_client.setServer(MQTT_SERVER, MQTT_PORT);
 }
 
 void loop() {
@@ -81,11 +83,11 @@ void loop() {
     setup_wifi();
   }
 
-  if (!mqtt_client.connected()) {
-    reconnect_mqtt();
+  if (!mqtts_client.connected()) {
+    reconnect_mqtts();
   }
 
-  mqtt_client.loop();
+  mqtts_client.loop();
 
   static unsigned long lastMsg = INT_MIN;
   unsigned long now = millis();
@@ -110,5 +112,5 @@ void loop() {
 
   Serial.printf("Publishing to topic %s: ", MQTT_TOPIC);
   Serial.println(payload);
-  mqtt_client.publish(MQTT_TOPIC, payload.c_str());
+  mqtts_client.publish(MQTT_TOPIC, payload.c_str());
 }
