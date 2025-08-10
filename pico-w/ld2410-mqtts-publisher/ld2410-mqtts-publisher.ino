@@ -21,7 +21,7 @@ MyLD2410 sensor(sensorSerial, true);
 MyLD2410 sensor(sensorSerial);
 #endif
 
-unsigned long nextPrint = 0, interval_ms = 5000; 
+unsigned long nextPrint = 0, interval_ms = 5000;
 
 void printValue(const byte &val) {
   Serial.print(' ');
@@ -152,10 +152,7 @@ void loop() {
   //delay(5000);
   if ((sensor.check() == MyLD2410::Response::DATA) && (millis() > nextPrint)) {
     nextPrint = millis() + interval_ms;
-    return;
-    
-  }
-  String payload = "{";
+    String payload = "{";
     payload += "\"motion_state\": " + String((sensor.getOutLevel()) ? "1" : "0");
     payload += "}";
 
@@ -167,4 +164,5 @@ void loop() {
     Serial.printf("Publishing to topic %s: ", MQTT_TOPIC);
     Serial.println(payload);
     mqtts_client.publish(MQTT_TOPIC, payload.c_str());
+  }
 }
