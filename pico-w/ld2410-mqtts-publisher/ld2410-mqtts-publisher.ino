@@ -21,7 +21,7 @@ MyLD2410 sensor(sensorSerial, true);
 MyLD2410 sensor(sensorSerial);
 #endif
 
-unsigned long nextPrint = 0, interval_ms = 5000;
+unsigned long next_print_at = 0, interval_ms = 1000;
 
 void printValue(const byte &val) {
   Serial.print(' ');
@@ -142,7 +142,7 @@ void setup() {
   sensor.enhancedMode(false);
 #endif
 
-  delay(nextPrint);
+  delay(next_print_at);
   setup_wifi();
   wifi_client.setCACert(root_ca);
   mqtts_client.setServer(MQTT_SERVER, MQTT_PORT);
@@ -150,8 +150,8 @@ void setup() {
 
 void loop() {
   //delay(5000);
-  if ((sensor.check() == MyLD2410::Response::DATA) && (millis() > nextPrint)) {
-    nextPrint = millis() + interval_ms;
+  if ((sensor.check() == MyLD2410::Response::DATA) && (millis() > next_print_at)) {
+    next_print_at = millis() + interval_ms;
     String payload = "{";
     payload += "\"motion_state\": " + String((sensor.getOutLevel()) ? "1" : "0");
     payload += "}";
