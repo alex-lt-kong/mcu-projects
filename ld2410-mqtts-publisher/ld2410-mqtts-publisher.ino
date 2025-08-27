@@ -1,10 +1,6 @@
 #include "configs.h"
 #define sensorSerial Serial1
 
-
-// User defines
-// #define DEBUG_MODE
-#define ENHANCED_MODE
 #define SERIAL_BAUD_RATE 115200
 
 //Change the communication baud rate here, if necessary
@@ -109,7 +105,7 @@ void setup_wifi(int attempts = 0) {
 
 void reconnect_mqtts() {
   while (!mqtts_client.connected()) {
-    Serial.printf("Connecting to MQTT broker " MQTT_SERVER ":%d\n", MQTT_PORT);
+    Serial.printf("Connecting to MQTT broker " MQTT_SERVER ":%d with MQTT_CLIENT_ID: " MQTT_CLIENT_ID "\n", MQTT_PORT);
     if (mqtts_client.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("connected");
     } else {
@@ -124,8 +120,14 @@ void reconnect_mqtts() {
 
 void setup() {
   Serial.begin(SERIAL_BAUD_RATE);
+#if defined(ARDUINO_ARCH_ESP32)
+  sensorSerial.setPins(0, 1);  // D0, D1 on Nano ESP32
+#elif defined(ARDUINO_ARCH_RP2040)
   sensorSerial.setTX(0);  // GP0
   sensorSerial.setRX(1);  // GP1
+#else
+#error "Define ARDUINO_ARCH_ESP32 or ARDUINO_ARCH_RP2040"
+#endif
   sensorSerial.begin(LD2410_BAUD_RATE);
 
 
@@ -136,14 +138,14 @@ void setup() {
     while (true) {}
   }
 
-#ifdef ENHANCED_MODE
+
+  //  enhanced (engineering) modes.
   sensor.enhancedMode();
-#else
-  sensor.enhancedMode(false);
-#endif
+
 
   delay(next_print_at);
   setup_wifi();
+  // wifi_client.setInsecure();
   wifi_client.setCACert(root_ca);
   mqtts_client.setServer(MQTT_SERVER, MQTT_PORT);
 }
@@ -152,8 +154,19 @@ void loop() {
   //delay(5000);
   if ((sensor.check() == MyLD2410::Response::DATA) && (millis() > next_print_at)) {
     next_print_at = millis() + interval_ms;
+    const auto movingTargetDetected = sensor.movingTargetDetected();
+    const auto stationaryTargetDetected = sensor.stationaryTargetDetected();
     String payload = "{";
-    payload += "\"motion_state\": " + String((sensor.getOutLevel()) ? "1" : "0");
+    payload += "\"stationary_target_detected\": " + String(stationaryTargetDetected ? '1' : '0') + ", ";
+    if (stationaryTargetDetected) {
+      payload += "\"stationary_target_distance_cm\": " + String(sensor.stationaryTargetDistance()) + ", ";
+    }
+    payload += "\"moving_target_detected\": " + String(movingTargetDetected ? '1' : '0');
+    if (movingTargetDetected) {
+      payload += +" ,";
+      payload += "\"moving_target_distance_cm\": " + String(sensor.stationaryTargetDistance());
+    }
+
     payload += "}";
 
 
