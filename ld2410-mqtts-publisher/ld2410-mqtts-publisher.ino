@@ -169,13 +169,16 @@ void loop() {
 
     payload += "}";
 
-
+    mqtts_client.loop();
     if (!mqtts_client.connected()) {
       reconnect_mqtts();
     }
-
-    Serial.printf("Publishing to topic %s: ", MQTT_TOPIC);
-    Serial.println(payload);
-    mqtts_client.publish(MQTT_TOPIC, payload.c_str());
+    
+    Serial.printf("Publishing payload [%s] to topic [%s]... ", payload.c_str(), MQTT_TOPIC);
+    if (mqtts_client.publish(MQTT_TOPIC, payload.c_str())) {
+      Serial.println("done");
+    } else {
+      Serial.println("failed!");
+    }
   }
 }
