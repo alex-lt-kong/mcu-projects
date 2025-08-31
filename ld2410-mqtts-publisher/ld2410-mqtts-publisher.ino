@@ -17,7 +17,7 @@ MyLD2410 sensor(sensorSerial, true);
 MyLD2410 sensor(sensorSerial);
 #endif
 
-unsigned long next_print_at = 0, interval_ms = 1000;
+unsigned long next_print_at = 0;
 
 void printValue(const byte &val) {
   Serial.print(' ');
@@ -153,7 +153,7 @@ void setup() {
 void loop() {
   //delay(5000);
   if ((sensor.check() == MyLD2410::Response::DATA) && (millis() > next_print_at)) {
-    next_print_at = millis() + interval_ms;
+    next_print_at = millis() + MQTT_PUBLISH_INTERVAL_MS;
     const auto movingTargetDetected = sensor.movingTargetDetected();
     const auto stationaryTargetDetected = sensor.stationaryTargetDetected();
     String payload = "{";
