@@ -152,40 +152,44 @@ void setup() {
 }
 
 void loop() {
-  //delay(5000);
-  if ((sensor.check() == MyLD2410::Response::DATA) && (millis() > next_print_at)) {
-    next_print_at = millis() + MQTT_PUBLISH_INTERVAL_MS;
-    const auto moving_target_detected = sensor.movingTargetDetected();
-    const auto stationary_target_detected = sensor.stationaryTargetDetected();
+  if (sensor.check() != MyLD2410::Response::DATA)
+    return;
+  if (millis() < next_print_at)
+    return;
 
-    const auto is_curr_positive = moving_target_detected || stationary_target_detected;
-    if (!is_prev_positive && !is_curr_positive)
-      return;
-    is_prev_positive = is_curr_positive;
-    
-    String payload = "{";
-    payload += "\"stationary_target_detected\": " + String(stationary_target_detected ? '1' : '0') + ", ";
-    if (stationary_target_detected) {
-      payload += "\"stationary_target_distance_cm\": " + String(sensor.stationaryTargetDistance()) + ", ";
-    }
-    payload += "\"moving_target_detected\": " + String(moving_target_detected ? '1' : '0');
-    if (moving_target_detected) {
-      payload += +" ,";
-      payload += "\"moving_target_distance_cm\": " + String(sensor.stationaryTargetDistance());
-    }
+  next_print_at = millis() + MQTT_PUBLISH_INTERVAL_MS;
+  const auto moving_target_detected = sensor.movingTargetDetected();
+  const auto stationary_target_detected = sensor.stationaryTargetDetected();
 
-    payload += "}";
+  // we want rapid response upon first positive, so we have to maintain the connection all the times
+  mqtts_client.loop();
+  if (!mqtts_client.connected()) {
+    reconnect_mqtts();
+  }
 
-    mqtts_client.loop();
-    if (!mqtts_client.connected()) {
-      reconnect_mqtts();
-    }
-    
-    Serial.printf("Publishing payload [%s] to topic [%s]... ", payload.c_str(), MQTT_TOPIC);
-    if (mqtts_client.publish(MQTT_TOPIC, payload.c_str())) {
-      Serial.println("done");
-    } else {
-      Serial.println("failed!");
-    }
+  const auto is_curr_positive = moving_target_detected || stationary_target_detected;
+  if (!is_prev_positive && !is_curr_positive)
+    return;
+  is_prev_positive = is_curr_positive;
+
+  String payload = "{";
+  payload += "\"stationary_target_detected\": " + String(stationary_target_detected ? '1' : '0') + ", ";
+  if (stationary_target_detected) {
+    payload += "\"stationary_target_distance_cm\": " + String(sensor.stationaryTargetDistance()) + ", ";
+  }
+  payload += "\"moving_target_detected\": " + String(moving_target_detected ? '1' : '0');
+  if (moving_target_detected) {
+    payload += +" ,";
+    payload += "\"moving_target_distance_cm\": " + String(sensor.stationaryTargetDistance());
+  }
+
+  payload += "}";
+
+
+  Serial.printf("Publishing payload [%s] to topic [%s]... ", payload.c_str(), MQTT_TOPIC);
+  if (mqtts_client.publish(MQTT_TOPIC, payload.c_str())) {
+    Serial.println("done");
+  } else {
+    Serial.println("failed!");
   }
 }
