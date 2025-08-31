@@ -18,6 +18,7 @@ MyLD2410 sensor(sensorSerial);
 #endif
 
 unsigned long next_print_at = 0;
+bool is_prev_positive = true;
 
 void printValue(const byte &val) {
   Serial.print(' ');
@@ -154,15 +155,21 @@ void loop() {
   //delay(5000);
   if ((sensor.check() == MyLD2410::Response::DATA) && (millis() > next_print_at)) {
     next_print_at = millis() + MQTT_PUBLISH_INTERVAL_MS;
-    const auto movingTargetDetected = sensor.movingTargetDetected();
-    const auto stationaryTargetDetected = sensor.stationaryTargetDetected();
+    const auto moving_target_detected = sensor.movingTargetDetected();
+    const auto stationary_target_detected = sensor.stationaryTargetDetected();
+
+    const auto is_curr_positive = moving_target_detected || stationary_target_detected;
+    if (!is_prev_positive && !is_curr_positive)
+      return;
+    is_prev_positive = is_curr_positive;
+    
     String payload = "{";
-    payload += "\"stationary_target_detected\": " + String(stationaryTargetDetected ? '1' : '0') + ", ";
-    if (stationaryTargetDetected) {
+    payload += "\"stationary_target_detected\": " + String(stationary_target_detected ? '1' : '0') + ", ";
+    if (stationary_target_detected) {
       payload += "\"stationary_target_distance_cm\": " + String(sensor.stationaryTargetDistance()) + ", ";
     }
-    payload += "\"moving_target_detected\": " + String(movingTargetDetected ? '1' : '0');
-    if (movingTargetDetected) {
+    payload += "\"moving_target_detected\": " + String(moving_target_detected ? '1' : '0');
+    if (moving_target_detected) {
       payload += +" ,";
       payload += "\"moving_target_distance_cm\": " + String(sensor.stationaryTargetDistance());
     }
