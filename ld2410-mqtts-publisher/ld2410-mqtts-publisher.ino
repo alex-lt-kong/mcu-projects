@@ -5,6 +5,7 @@
 
 //Change the communication baud rate here, if necessary
 //#define LD2410_BAUD_RATE 256000
+#include <ArduinoJson.h>
 #include <MyLD2410.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
@@ -17,7 +18,8 @@ MyLD2410 sensor(sensorSerial, true);
 MyLD2410 sensor(sensorSerial);
 #endif
 
-unsigned long next_print_at = 0;
+unsigned long next_positive_publish_at = 0;
+unsigned long next_negative_publish_at = 0;
 bool is_prev_positive = true;
 
 void printValue(const byte &val) {
@@ -138,13 +140,10 @@ void setup() {
     Serial.println("Failed to communicate with the sensor.");
     while (true) {}
   }
-
-
   //  enhanced (engineering) modes.
   sensor.enhancedMode();
 
-
-  delay(next_print_at);
+//  delay(next_positive_publish_at);
   setup_wifi();
   // wifi_client.setInsecure();
   wifi_client.setCACert(root_ca);
@@ -154,40 +153,47 @@ void setup() {
 void loop() {
   if (sensor.check() != MyLD2410::Response::DATA)
     return;
-  if (millis() < next_print_at)
-    return;
-
-  next_print_at = millis() + MQTT_PUBLISH_INTERVAL_MS;
+  const auto t_ms = millis();
+  
+  //if (millis < next_positive_publish_at && millis < next_negative_publish_at)
+  //  return;
+  
   const auto moving_target_detected = sensor.movingTargetDetected();
   const auto stationary_target_detected = sensor.stationaryTargetDetected();
 
-  // we want rapid response upon first positive, so we have to maintain the connection all the times
+  const auto is_curr_positive = moving_target_detected || stationary_target_detected;
+  if (!is_prev_positive && !is_curr_positive && t_ms < next_negative_publish_at)
+    return;
+  if ((is_prev_positive || is_curr_positive) && t_ms < next_positive_publish_at)
+    return;
+  is_prev_positive = is_curr_positive;
+
+  if (is_curr_positive)
+    next_positive_publish_at = t_ms + MQTT_POSITIVE_PUBLISH_INTERVAL_MS;
+  else
+    next_negative_publish_at = t_ms + MQTT_NEGATIVE_PUBLISH_INTERVAL_MS;
+
+  JsonDocument jsonDoc;
+  jsonDoc["stationary_target_detected"] = stationary_target_detected;
+  if (stationary_target_detected)
+    jsonDoc["stationary_target_distance_cm"] = sensor.stationaryTargetDistance();
+  jsonDoc["moving_target_detected"] = moving_target_detected;
+  if (moving_target_detected)
+    jsonDoc["moving_target_distance_cm"] = sensor.movingTargetDistance();
+
+  String output;
+  serializeJson(jsonDoc, output);
+  Serial.printf("Publishing payload [%s] to topic [%s]... ", output.c_str(), MQTT_TOPIC);
+  
+  std::string msgPackStr;
+  size_t size = serializeMsgPack(jsonDoc, msgPackStr);
+
   mqtts_client.loop();
   if (!mqtts_client.connected()) {
     reconnect_mqtts();
   }
 
-  const auto is_curr_positive = moving_target_detected || stationary_target_detected;
-  if (!is_prev_positive && !is_curr_positive)
-    return;
-  is_prev_positive = is_curr_positive;
-
-  String payload = "{";
-  payload += "\"stationary_target_detected\": " + String(stationary_target_detected ? '1' : '0') + ", ";
-  if (stationary_target_detected) {
-    payload += "\"stationary_target_distance_cm\": " + String(sensor.stationaryTargetDistance()) + ", ";
-  }
-  payload += "\"moving_target_detected\": " + String(moving_target_detected ? '1' : '0');
-  if (moving_target_detected) {
-    payload += +" ,";
-    payload += "\"moving_target_distance_cm\": " + String(sensor.stationaryTargetDistance());
-  }
-
-  payload += "}";
-
-
-  Serial.printf("Publishing payload [%s] to topic [%s]... ", payload.c_str(), MQTT_TOPIC);
-  if (mqtts_client.publish(MQTT_TOPIC, payload.c_str())) {
+  if (mqtts_client.publish(MQTT_TOPIC, msgPackStr.c_str())) {
     Serial.println("done");
   } else {
     Serial.println("failed!");
