@@ -39,6 +39,12 @@ void setup_wifi(int attempts = 0) {
 
 void reconnect_mqtts() {
   while (!mqtts_client.connected()) {
+
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi lost. Reconnecting...");
+      setup_wifi();
+    }
+
     Serial.printf("Connecting to MQTT broker " MQTT_SERVER ":%d\n", MQTT_PORT);
     if (mqtts_client.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("connected");
@@ -78,11 +84,6 @@ void setup() {
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi lost. Reconnecting...");
-    setup_wifi();
-  }
-
   if (!mqtts_client.connected()) {
     reconnect_mqtts();
   }

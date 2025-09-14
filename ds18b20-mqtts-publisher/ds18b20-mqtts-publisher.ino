@@ -41,6 +41,12 @@ void setup_wifi(int attempts = 0) {
 
 void reconnect_mqtts() {
   while (!mqtts_client.connected()) {
+
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi lost. Reconnecting...");
+      setup_wifi();
+    }
+
     Serial.printf("Connecting to MQTT broker " MQTT_SERVER ":%d\n", MQTT_PORT);
     if (mqtts_client.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("connected");
@@ -60,14 +66,11 @@ void setup() {
   setup_wifi();
   wifi_client.setCACert(root_ca);
   mqtts_client.setServer(MQTT_SERVER, MQTT_PORT);
+  // Call the request once, otherwise seems it wont be immediately ready at first loop() call
+  sensor.requestTemp();
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi lost. Reconnecting...");
-    setup_wifi();
-  }
-
   if (!mqtts_client.connected()) {
     reconnect_mqtts();
   }
@@ -76,12 +79,12 @@ void loop() {
   sensor.requestTemp();
 
   JsonDocument jsonDoc;
-  jsonDoc["temp_celsius"] = round(sensor.getTemp() * 10) / 10.0;;
+  jsonDoc["temp_celsius"] = round(sensor.getTemp() * 10) / 10.0;
 
   String output;
   serializeJson(jsonDoc, output);
   Serial.printf("Publishing payload [%s] to topic [%s]... ", output.c_str(), MQTT_TOPIC);
-  
+
   std::string msgPackStr;
   size_t size = serializeMsgPack(jsonDoc, msgPackStr);
 
@@ -90,5 +93,5 @@ void loop() {
   } else {
     Serial.println("failed!");
   }
-  delay(60000);
+  delay(300000);
 }
