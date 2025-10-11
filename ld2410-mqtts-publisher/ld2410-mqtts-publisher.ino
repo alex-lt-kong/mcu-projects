@@ -108,7 +108,7 @@ void setup_wifi(int attempts = 0) {
 
 void reconnect_mqtts() {
   while (!mqtts_client.connected()) {
-    
+
     if (WiFi.status() != WL_CONNECTED) {
       Serial.println("WiFi lost. Reconnecting...");
       setup_wifi();
@@ -128,6 +128,7 @@ void reconnect_mqtts() {
 }
 
 void setup() {
+  delay(10000);
   Serial.begin(SERIAL_BAUD_RATE);
 #if defined(ARDUINO_ARCH_ESP32)
   sensorSerial.setPins(0, 1);  // D0, D1 on Nano ESP32
@@ -149,7 +150,7 @@ void setup() {
   //  enhanced (engineering) modes.
   sensor.enhancedMode();
 
-//  delay(next_positive_publish_at);
+  //  delay(next_positive_publish_at);
   setup_wifi();
   // wifi_client.setInsecure();
   wifi_client.setCACert(root_ca);
@@ -160,10 +161,10 @@ void loop() {
   if (sensor.check() != MyLD2410::Response::DATA)
     return;
   const auto t_ms = millis();
-  
+
   //if (millis < next_positive_publish_at && millis < next_negative_publish_at)
   //  return;
-  
+
   const auto moving_target_detected = sensor.movingTargetDetected();
   const auto stationary_target_detected = sensor.stationaryTargetDetected();
 
@@ -190,7 +191,7 @@ void loop() {
   String output;
   serializeJson(jsonDoc, output);
   Serial.printf("Publishing payload [%s] to topic [%s]... ", output.c_str(), MQTT_TOPIC);
-  
+
   std::string msgPackStr;
   size_t size = serializeMsgPack(jsonDoc, msgPackStr);
 
